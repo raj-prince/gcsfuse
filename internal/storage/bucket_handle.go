@@ -34,7 +34,12 @@ import (
 
 type bucketHandle struct {
 	gcs.Bucket
-	bucket *storage.BucketHandle
+	bucket     *storage.BucketHandle
+	bucketName string
+}
+
+func (bh *bucketHandle) Name() string {
+	return bh.bucketName
 }
 
 func (bh *bucketHandle) NewReader(
@@ -308,6 +313,52 @@ func (b *bucketHandle) UpdateObject(ctx context.Context, req *gcs.UpdateObjectRe
 			err = fmt.Errorf("Error in updating object: %w", err)
 		}
 	}
+
+	return
+}
+
+func (b *bucketHandle) ComposeObjects(ctx context.Context, req *gcs.ComposeObjectsRequest) (o *gcs.Object, err error) {
+	dstObj := b.bucket.Object(req.DstName)
+
+	if req.DstGenerationPrecondition != nil && req.DstMetaGenerationPrecondition != nil {
+		dstObj = dstObj.If(storage.Conditions{GenerationMatch: *req.DstGenerationPrecondition, MetagenerationMatch: *req.DstMetaGenerationPrecondition})
+	} else if req.DstGenerationPrecondition != nil {
+		dstObj = dstObj.If(storage.Conditions{GenerationMatch: *req.DstGenerationPrecondition})
+	} else if req.DstMetaGenerationPrecondition != nil {
+		dstObj = dstObj.If(storage.Conditions{MetagenerationMatch: *req.DstMetaGenerationPrecondition})
+	}
+
+	// Converting the req.Sources list to a list of storage.ObjectHandle as expected by the Go Storage Client.
+	var srcObjList []*storage.ObjectHandle
+	for _, src := range req.Sources {
+		currSrcObj := b.bucket.Object(src.Name)
+		// Switching to requested Generation of the object.
+		// Zero src generation is the latest generation, we are skipping it because by default it will take the latest one
+		if src.Generation != 0 {
+			currSrcObj = currSrcObj.Generation(src.Generation)
+		}
+		srcObjList = append(srcObjList, currSrcObj)
+	}
+
+	// Composing Source Objects to Destination Object using Composer created through Go Storage Client.
+	attrs, err := dstObj.ComposerFrom(srcObjList...).Run(ctx)
+	if err != nil {
+		switch ee := err.(type) {
+		case *googleapi.Error:
+			if ee.Code == http.StatusPreconditionFailed {
+				err = &gcs.PreconditionError{Err: ee}
+			}
+			if ee.Code == http.StatusNotFound {
+				err = &gcs.NotFoundError{Err: storage.ErrObjectNotExist}
+			}
+		default:
+			err = fmt.Errorf("Error in composing object: %w", err)
+		}
+		return
+	}
+
+	// Converting attrs to type *Object.
+	o = storageutil.ObjectAttrsToBucketObject(attrs)
 
 	return
 }
