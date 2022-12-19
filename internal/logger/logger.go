@@ -79,7 +79,7 @@ func init() {
 
 func UpdateTheWriterInAllLoggers() error {
 	for _, lg := range listOfLoggers {
-		lg.SetOutput(defaultLoggerFactory.writer(lg.Prefix()))
+		lg.SetOutput(defaultLoggerFactory.writer("Prince"))
 	}
 	return nil
 }
@@ -204,6 +204,9 @@ func (f *loggerFactory) writer(level string) io.Writer {
 		}
 	}
 
+	if f.file != nil && level == "" {
+		panic("No file: how could this possible")
+	}
 	switch level {
 	case "NOTICE":
 		return daemonize.StatusWriter
