@@ -70,6 +70,11 @@ func BuildGcsfuse(dstDir string) (err error) {
 	log.Printf("Building gcsfuse into %s", dstDir)
 
 	{
+		fmt.Println("Prince")
+		fmt.Println("Tool Path: ", toolPath)
+		fmt.Println("Src dir: ", srcDir)
+		fmt.Println("Dst dir: ", dstDir)
+
 		cmd := exec.Command(
 			toolPath,
 			srcDir,

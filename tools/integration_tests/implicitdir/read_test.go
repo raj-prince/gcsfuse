@@ -16,8 +16,10 @@
 package implicitdir_test
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
+	"syscall"
 	"testing"
 )
 
@@ -31,8 +33,11 @@ func TestReadAfterWrite(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		tmpFile, err := ioutil.TempFile(tmpDir, "tmpFile")
 		if err != nil {
+			fmt.Println("Failure: ", i)
 			t.Errorf("Create file at %q: %v", tmpDir, err)
 			return
+		} else {
+			fmt.Println("Success: ", i)
 		}
 
 		fileName := tmpFile.Name()
@@ -46,8 +51,8 @@ func TestReadAfterWrite(t *testing.T) {
 		// After write, data will be cached by kernel. So subsequent read will be
 		// served using cached data by kernel instead of calling gcsfuse.
 		// Clearing kernel cache to ensure that gcsfuse is invoked during read operation.
-		clearKernelCache()
-		tmpFile, err = os.Open(fileName)
+		//clearKernelCache()
+		tmpFile, err = os.OpenFile(fileName, syscall.O_DIRECT|syscall.O_RDONLY, 0)
 		if err != nil {
 			t.Errorf("Open %q: %v", fileName, err)
 			return

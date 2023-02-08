@@ -19,7 +19,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -29,7 +28,8 @@ import (
 	"github.com/googlecloudplatform/gcsfuse/tools/util"
 )
 
-var testBucket = flag.String("testbucket", "", "The GCS bucket used for the test.")
+var prince_bucket_name = "princer_integration_test"
+var testBucket = &prince_bucket_name //flag.String("testbucket", "", "The GCS bucket used for the test.")
 
 var (
 	binFile string
@@ -41,11 +41,12 @@ var (
 
 func setUpTestDir() error {
 	var err error
-	testDir, err = ioutil.TempDir("", "gcsfuse_readwrite_test_")
-	if err != nil {
-		return fmt.Errorf("TempDir: %w\n", err)
-	}
+	//testDir, err = ioutil.TempDir("", "gcsfuse_readwrite_test_")
+	//if err != nil {
+	//	return fmt.Errorf("TempDir: %w\n", err)
+	//}
 
+	testDir = "/tmp/gcsfuse_readwrite_test_3109149204/"
 	err = util.BuildGcsfuse(testDir)
 	if err != nil {
 		return fmt.Errorf("BuildGcsfuse(%q): %w\n", testDir, err)
@@ -68,8 +69,13 @@ func mountGcsfuse(flag string) error {
 		"--debug_gcs",
 		"--debug_fs",
 		"--debug_fuse",
+		"--debug_http",
 		"--log-file="+logFile,
 		"--log-format=text",
+		"--http-client-timeout=30000ms",
+		"--max-conns-per-host=100",
+		"--disable-http2",
+		//"--experimental-enable-storage-client-library",
 		flag,
 		*testBucket,
 		mntDir,
@@ -177,8 +183,8 @@ func executeTest(flags []string, m *testing.M) (successCode int) {
 
 		successCode = m.Run()
 
-		os.RemoveAll(mntDir)
-		err = unMount()
+		//os.RemoveAll(mntDir)
+		//err = unMount()
 		if err != nil {
 			logAndExit(fmt.Sprintf("Error in unmounting bucket: %v", err))
 		}
@@ -196,6 +202,7 @@ func executeTest(flags []string, m *testing.M) (successCode int) {
 func TestMain(m *testing.M) {
 	flag.Parse()
 
+	fmt.Println("Main method is called!")
 	if *testBucket == "" {
 		log.Printf("--testbucket must be specified")
 		os.Exit(0)
@@ -206,10 +213,12 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	flags := []string{"--experimental-enable-storage-client-library=true",
+	flags := []string{
+		//"--experimental-enable-storage-client-library=true",
 		"--experimental-enable-storage-client-library=false",
 		"--implicit-dirs=true",
-		"--implicit-dirs=false"}
+		"--implicit-dirs=false",
+	}
 
 	successCode := executeTest(flags, m)
 	log.Printf("Test log: %s\n", logFile)
